@@ -16,12 +16,14 @@ import scala.xml.{Node }
 import ontology._
 import info.kwarc.mmt.stex._
 
+import org.apache.commons.lang3.StringEscapeUtils._
+
 object ThesaurusGenerator {
 
   private var counter = 0
   def getNewId : String = {
     counter += 1
-    "gs_" + counter.toString
+    counter.toString
   }
   private var presenter: ThesaurusFormatter = null
   private var controller: Controller = null
@@ -221,6 +223,7 @@ object ThesaurusGenerator {
     }
 
     out("definition") = JSONString(sb.get)
+    out("id") = JSONString(getNewId)
 
     JSONObject(out.toSeq : _*)
   }
