@@ -1,0 +1,97 @@
+<!DOCTYPE>
+<html>
+<head>
+  <title></title>
+  <!-- JQuery -->
+  <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha256-/SIrNqv8h6QGKDuNoLGA4iret+kyesCkHGzVUUV0shc=" crossorigin="anonymous"></script>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+  <!-- MathJax -->
+  <!--<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>-->
+
+  <!-- Angular -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-sanitize/1.6.4/angular-sanitize.min.js"></script>
+
+  <link rel="stylesheet" href="mmt.css">
+  <link rel="stylesheet" href="browser.css">
+  <link rel="stylesheet" href="latexml.css">
+</head>
+<body>
+  <div data-ng-app="myApp" data-ng-controller="customersCtrl" class="container" id="glossary">
+    <div class="row">
+      <div class="col-md-12">
+        <nav class="navbar navbar-default">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button> 
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+              <form class="navbar-form navbar-left">
+                <div class="form-group">
+                  <select class="form-control">
+                    <option>Language</option>
+                    <option>EN</option>
+                    <!-- <option>DE</option> -->
+                  </select>
+                  <select class="form-control">
+                    <option>Page</option>
+                    <option>1</option>
+                    <!-- <option>2</option> -->
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-default">Filter</button>
+              </form>
+            </div><!-- /.navbar-collapse -->
+          </div><!-- /.container-fluid -->
+        </nav>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <div class="panel panel-default" data-ng-repeat="x in myData">
+          <div class="panel-body">
+            <div><b><a href="#"><i data-ng-bind-html="x.primary | html"></i></a></b><span class="pull-right"><a data-toggle="collapse" href="#entry{{x.id}}" aria-expanded="false" aria-controls="entry1">Details</a></span></div>
+            <div class="collapse" id="entry{{x.id}}">
+            <hr/>
+              <div data-ng-bind-html="x.definition | html"></div>
+
+              
+              <span><b>Translations: </b><a href="#">Gruppe (DE)</a></span><br/>
+
+              <span><b>Hypernyms: </b><a href="#">Monoid</a></span><br/>
+              <span><b>Hyponyms: </b><a href="#">Albelian group></a></span><br/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script>
+    var app = angular.module('myApp', []);
+    app.controller('customersCtrl', function($scope, $http) {
+        $http.get("http://localhost:8080/:thesaurus/foo").then(function(response) {
+            $scope.myData = response.data;
+        });
+    });
+
+    app.filter('html', ['$sce', function ($sce) {
+        return function (text) {
+            return $sce.trustAsHtml(text);
+        };
+    }])
+</script>
+</body>
+</html>
