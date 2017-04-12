@@ -82,7 +82,14 @@
   <script>
     var app = angular.module('myApp', []);
     app.controller('customersCtrl', function($scope, $http) {
-        $http.get("http://localhost:8080/:thesaurus/foo").then(function(response) {
+        $http.post(
+            'http://localhost:8080/:thesaurus/foo',
+            { test: 'test'},
+            {
+                headers : {
+                    'Content-Type' : 'text/plain'
+                }
+            }).then(function(response) {
             $scope.myData = response.data;
         });
     });
