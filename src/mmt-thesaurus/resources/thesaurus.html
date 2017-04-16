@@ -83,7 +83,7 @@
     var app = angular.module('myApp', []);
     app.controller('customersCtrl', function($scope, $http) {
         $http.post(
-            'http://localhost:8080/:thesaurus/foo',
+            'http://localhost:8080/:thesaurus/getAllEntries',
             { test: 'test'},
             {
                 headers : {

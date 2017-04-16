@@ -17,6 +17,7 @@ import ontology._
 import info.kwarc.mmt.stex._
 
 import org.apache.commons.lang3.StringEscapeUtils._
+import scala.collection.mutable.ListBuffer
 
 object ThesaurusGenerator {
 
@@ -29,7 +30,7 @@ object ThesaurusGenerator {
   private var controller: Controller = null
   private var rh: StringBuilder = null
 
-  def generate(controller: Controller): JSON = {
+  def generate(controller: Controller, params: JSONObject): JSON = {
     this.controller = controller
     this.presenter = controller.extman.get(classOf[Presenter], "thesaurus") match {
       case Some(p: ThesaurusFormatter) => p
@@ -48,7 +49,7 @@ object ThesaurusGenerator {
         case e : Exception => None
       }
     }
-//    print(mpaths)
+
     val verbs = modules collect {
       case thy: DeclaredTheory =>
         thy.getDeclarations collect {
@@ -56,19 +57,16 @@ object ThesaurusGenerator {
             c.notC.verbalizationDim.notations.values.flatten.map(c.path -> _)
         }
     }
-//    println()
-//    print(verbs)
-//    println()
-//    print(verbs.flatten.flatten.toList.distinct)
-//    println()
-    val theories: List[(GlobalName, TextNotation)] = verbs.flatten.flatten.distinct
-    val head = theories.filter(p => {
-      println(p._1.name.toString)
-      true
-    })
 
+    var theories: List[(GlobalName, TextNotation)] = verbs.flatten.flatten.distinct
 
-    val out = present(verbs.flatten.flatten.distinct)
+    counter = 0 // reset counter for each request
+
+    var language = params("lang").getOrElse("\"en\"").toString // english is default
+    language = language.substring(1, language.length - 1)
+    theories = theories.sortWith((x,y) => makeString(x._2).toLowerCase() < makeString(y._2).toLowerCase())
+    val verbs_lang = getByLanguage(theories, language)
+    val out = present(verbs_lang, params)
     JSONArray.fromList(out)
   }
 
@@ -88,7 +86,17 @@ object ThesaurusGenerator {
     smks.mkString(" ")
   }
 
-  private def present(verbs: Iterable[(GlobalName, TextNotation)]): List[JSON] = {
+  private def getByLanguage(verbs: Iterable[(GlobalName, TextNotation)], language: String): Iterable[(GlobalName, TextNotation)] = {
+    val out = new ListBuffer[(GlobalName, TextNotation)]()
+    verbs foreach {p => p._2.scope.languages.foreach { lang =>
+      if (lang == language) {
+        out.append(p)
+      }
+    }}
+    out
+  }
+
+  private def present(verbs: Iterable[(GlobalName, TextNotation)], params:JSONObject): List[JSON] = {
     val items = new collection.mutable.HashMap[String, List[(GlobalName, TextNotation)]]
     verbs foreach {p => p._2.scope.languages.foreach { lang =>
      if (lang != "") {

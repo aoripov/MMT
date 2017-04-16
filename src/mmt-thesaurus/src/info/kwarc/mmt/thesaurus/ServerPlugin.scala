@@ -34,8 +34,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
       uriComps match {
         case "getNotations" :: _ => getNotations(json)
         case "getDefinitions" :: _ => getDefinitions(json)
-        case "generateGlossary" :: _ => generateGlossary
-        case "foo" :: _ => foo
+        case "getAllEntries" :: _ => getAllEntries(json)
         case _ => errorResponse("Invalid request: " + uriComps.mkString("/"), List(new ThesaurusError("Invalid Request" + uriComps)))
        }
     } catch {
@@ -43,7 +42,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         log(e.shortMsg) 
         errorResponse(e.shortMsg, List(e))
       case e : Exception => 
-        errorResponse("Exception occured : " + e.getStackTrace(), List(e))
+        errorResponse("Exception occurred : " + e.getStackTrace(), List(e))
     }
   }
   
@@ -106,21 +105,9 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
       }
       Server.JsonResponse(JSONArray(resultNodes.map(s => JSONString(s)).toSeq :_*))
   }
-  
-  private def generateGlossary = {
-    try {
-      val location = utils.File("/home/akbar/localmh/MathHub/glossary.html")
-//      val glossary = ThesaurusGenerator.generate(controller)
-      //utils.File.write(location, glossary)
-      print("GENERATING THESAURUS")
-      Server.TextResponse("Success")
-    } catch {
-      case e : Exception => Server.TextResponse(e.getMessage() + "\n" + e.getStackTrace.mkString("\n"))
-    }
-  }
 
-  private def foo = {
-    Server.JsonResponse(ThesaurusGenerator.generate(controller))
+  private def getAllEntries(json: JSONObject) = {
+    Server.JsonResponse(ThesaurusGenerator.generate(controller, json))
   }
   
   //utils
