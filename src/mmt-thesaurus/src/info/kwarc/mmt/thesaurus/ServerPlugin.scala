@@ -10,12 +10,14 @@ import info.kwarc.mmt.api.backend._
 import info.kwarc.mmt.api.ontology._
 import info.kwarc.mmt.api.informal._
 import info.kwarc.mmt.stex._
-import symbols.{Constant}
-
+import symbols.Constant
 import utils._
+
+import scala.collection.mutable.ArrayBuffer
 //import scala.util.parsing.json._
 import tiscaf._
 import scala.concurrent._
+import org.apache.commons.lang3.StringEscapeUtils.{unescapeJava}
 
 case class ThesaurusError(text : String) extends Error(text)
 
@@ -35,6 +37,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         case "getNotations" :: _ => getNotations(json)
         case "getDefinitions" :: _ => getDefinitions(json)
         case "getAllEntries" :: _ => getAllEntries(json)
+        case "getTranslations" :: _ => getTranslations(json)
         case _ => errorResponse("Invalid request: " + uriComps.mkString("/"), List(new ThesaurusError("Invalid Request" + uriComps)))
        }
     } catch {
@@ -67,7 +70,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
             case Some(lang) => notations.filter(_.scope.languages.contains(lang))
           }
           Server.JsonResponse(JSONArray(notations.map(n => JSONArray(toStringMarkers(n).map(s => JSONString(s)) : _*)).toSeq :_*))
-        case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass())
+        case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
       }
   }
   
@@ -83,27 +86,55 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
   }
   
   private def getDefinitions(params: JSONObject) = {
-      val spathS = params("spath").getOrElse(throw ServerError("No spath found")).toString
-      val languageO = params("language").map(_.toString)
-      val spath = Path.parse(spathS)
+      val spath = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+      val languageO = params("language").map(_.toString).map(removeQuotes(_))
+
       var resultSet = controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy))
+
       resultSet = languageO match {
         case None => resultSet
         case Some(_) => resultSet.filter(p => sTeX.getLanguage(p) == languageO)
       }
-      
-      //presenting
-      val pres = controller.extman.get(classOf[Presenter]).find(_.isApplicable("thesaurus")).getOrElse(throw ServerError("No presenter found"))
+
+      val presenter = controller.extman.get(classOf[Presenter]).find(_.isApplicable("thesaurus")).getOrElse(throw ServerError("No presenter found"))
       val resultNodes = resultSet flatMap {p => 
         controller.get(p) match {
           case s : StructuralElement =>
             val rb = new presentation.StringBuilder
-            pres(s)(rb)
+            presenter(s)(rb)
             Some(rb.get)
           case _ => None
         }
       }
-      Server.JsonResponse(JSONArray(resultNodes.map(s => JSONString(s)).toSeq :_*))
+      Server.JsonResponse(JSONArray(resultNodes.map(s => JSONString(s)) :_*))
+  }
+
+  private def getTranslations(params: JSONObject) = {
+    val spath = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+    val languageO = params("language").map(_.toString).map(removeQuotes(_))
+
+    val parentSpaths = controller.depstore.queryList(spath, ToSubject(IRels.isDefinedBy))
+
+    val responseBuffer = ArrayBuffer.empty[JSON]
+
+    var resultSet = parentSpaths match {  
+      case Nil => controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy))
+      case hd::tl => controller.depstore.queryList(hd, ToObject(IRels.isDefinedBy))
+    }
+
+    resultSet = languageO match {
+      case None => resultSet
+      case Some(_) => resultSet.filter(p => sTeX.getLanguage(p) != languageO)
+    }
+
+    resultSet foreach { p =>
+      val response = new collection.mutable.HashMap[String, JSON]()
+      response("language") = JSONString(sTeX.getLanguage(p).getOrElse(throw ServerError("No language found")))
+      response("spath") = JSONString(p.toString)
+      responseBuffer += JSONObject(response.toSeq: _*)
+    }
+
+    Server.JsonResponse(JSONArray(responseBuffer : _*))
   }
 
   private def getAllEntries(json: JSONObject) = {
@@ -162,5 +193,9 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
     }
       log("Sending Response: " + response)
       Server.JsonResponse(JSONObject(response.toSeq : _*))     
+  }
+
+  private def removeQuotes(s:String):String = {
+    s.substring(1, s.length - 1)
   }
 }
