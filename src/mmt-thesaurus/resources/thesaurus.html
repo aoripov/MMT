@@ -40,18 +40,24 @@
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <form class="navbar-form navbar-left">
                 <div class="form-group">
-                  <select class="form-control">
-                    <option>Language</option>
-                    <option>EN</option>
+                  <select class="form-control" data-ng-model="filter.language" data-ng-change="getAllEntries()">
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="ro">Romanian</option>
+                    <option value="tr">Turkish</option>
+                    <option value="zhs">Chinese Simplified</option>
+                    <option value="zht">Chinese Traditional</option>
                     <!-- <option>DE</option> -->
                   </select>
-                  <select class="form-control">
+                  <select class="form-control" data-ng-model="filter.page">
                     <option>Page</option>
-                    <option>1</option>
+                    <option value="1">1</option>
                     <!-- <option>2</option> -->
                   </select>
                 </div>
+                {{filter.page}}
                 <button type="submit" class="btn btn-default">Filter</button>
+
               </form>
             </div><!-- /.navbar-collapse -->
           </div><!-- /.container-fluid -->
@@ -68,7 +74,9 @@
               <div data-ng-bind-html="x.definition | html"></div>
 
               
-              <span><b>Translations: </b><a href="#">Gruppe (DE)</a></span><br/>
+              <span><b>Translations: </b>
+
+                <!--<a href="#" data-ng-repeat="tr in getTranslation  s(x.spath)">{{tr.notation + "(" + tr.language + ") "}}</a></span><br/>-->
 
               <span><b>Hypernyms: </b><a href="#">Monoid</a></span><br/>
               <span><b>Hyponyms: </b><a href="#">Albelian group></a></span><br/>
@@ -82,16 +90,48 @@
   <script>
     var app = angular.module('myApp', []);
     app.controller('customersCtrl', function($scope, $http) {
-        $http.post(
-            'http://localhost:8080/:thesaurus/getAllEntries',
-            { test: 'test'},
-            {
-                headers : {
-                    'Content-Type' : 'text/plain'
-                }
-            }).then(function(response) {
-            $scope.myData = response.data;
-        });
+        $scope.language = 'en'
+        $scope.filter = {
+            language:"en",
+            page:1,
+            entries:10
+        };
+        $scope.getAllEntries = function() {
+            $http.post(
+                'http://localhost:8080/:thesaurus/getAllEntries',
+                {
+                    lang: $scope.filter.language,
+                    page_number: 1,
+                    entries: 1
+                },
+                {
+                    headers : {
+                        'Content-Type' : 'text/plain'
+                    }
+                }).then(function(response) {
+                $scope.myData = response.data;
+            });
+        };
+        $scope.getTranslations = function($spath) {
+            $http.post(
+              'http://localhost:8080/:thesaurus/getTranslations',
+              {
+                  lang: $scope.language,
+                  spath: $spath
+              },
+              {
+                  headers : {
+                      'Content-Type' : 'text/plain'
+                  }
+              }).then(function(response) {
+              $scope.myData = response.data;
+          });
+        };
+        $scope.count = 0;
+        $scope.myfunc = function() {
+            $scope.count++;
+        }
+        $scope.getAllEntries();
     });
 
     app.filter('html', ['$sce', function ($sce) {

@@ -147,16 +147,46 @@ object ThesaurusGenerator {
     }
   }
 
+  private def getNymsByRelations(spath : GlobalName, lang:String, relEx : RelationExp): Iterable[Iterable[TextNotation]] = {
+    val primarySym = controller.depstore.queryList(spath, HasType(IsPrimarySymbol))
+    lazy val mpath = spath.module
+    if (primarySym.nonEmpty) {
+      controller.depstore.queryList(mpath, relEx) flatMap {
+        case p: Path =>
+          controller.getO(p) match {
+            case Some(fd: Theory) =>
+              val mpath = fd.path
+              val verbs = getVerbalizations(mpath, lang)
+              if (verbs.isEmpty) {
+                None
+              } else {
+                Some(verbs)
+              }
+            case _ => None
+          }
+      }
+    } else Nil
+  }
+
+  def getHypernyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = getNymsByRelations(spath, lang, ToObject(IsHypernymOf)).flatten
+
+  def getHyponyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = getNymsByRelations(spath, lang, ToSubject(IsHypernymOf)).flatten
+
+  def getSynonyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = {
+    val constant = controller.library.getConstant(spath)
+    constant.notC.verbalizationDim.get(lang=Some(lang))
+  }
+
   private def present(lang : String,  spath : GlobalName, not: TextNotation): JSON = {
+    val constant = controller.library.getConstant(spath)
     val doc = spath.doc
     val mod = spath.module.name
     val name = spath.name
-    val constant = controller.library.getConstant(spath)
-    val alternatives = constant.notC.verbalizationDim.notations.values.flatten.flatMap(_.scope.languages.filter(_ != lang)).toSet
+
 
     val notations = (constant.notC.parsingDim.notations.values.flatten ++ constant.notC.presentationDim.notations.values.flatten).map(n => spath -> n).toList.distinct
 
-    val defs = controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy)) flatMap {
+    val definitions = controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy)) flatMap {
           case p: Path =>
             controller.getO(p) match {
               case Some(fd: Constant) =>
@@ -172,48 +202,9 @@ object ThesaurusGenerator {
 
     val response = new collection.mutable.HashMap[String, JSON]()
 
-    val primarySym = controller.depstore.queryList(spath, HasType(IsPrimarySymbol))
-    val hypernyms = if (!primarySym.isEmpty) {
-      val mpath = spath.module 
-      controller.depstore.queryList(mpath, ToObject(IsHypernymOf)) flatMap {
-        case p: Path =>
-          controller.getO(p) match {
-            case Some(fd: Theory) =>
-              val mpath = fd.path
-              val verbs = getVerbalizations(mpath, lang)
-              if (verbs.isEmpty) {
-                None
-              } else {
-                Some(verbs)
-              }
-            case _ => None
-          }
-      }
-    } else Nil
-    
-    val hyponyms = if  (!primarySym.isEmpty) {
-      val mpath = spath.module 
-      controller.depstore.queryList(mpath, ToSubject(IsHypernymOf)) flatMap {
-        case p: Path =>
-          controller.getO(p) match {
-            case Some(fd: Theory) =>
-              val mpath = fd.path
-              val verbs = getVerbalizations(mpath, lang)
-              if (verbs.isEmpty) {
-                None
-              } else {
-                Some(verbs)
-              }
-            case _ => None
-          }
-      }
-    } else Nil
-    
-    print(defs.length)
-    
-    val synonyms = constant.notC.verbalizationDim.get(lang=Some(lang)).filter(_ != not)
-    
-    if (defs.isEmpty) {
+    constant.notC.verbalizationDim.get(lang=Some(lang)).filter(_ != not)
+
+    if (definitions.isEmpty) {
       return null
     }
 
@@ -230,8 +221,8 @@ object ThesaurusGenerator {
 
     sb = new StringBuilder
     presenter.setRh(sb)
-    defs foreach { fd =>
-      presenter.apply(fd)(sb)
+    definitions foreach { constant =>
+      presenter.apply(constant)(sb)
     }
     out("definition") = JSONString(sb.get)
 
