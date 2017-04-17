@@ -126,7 +126,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         notations foreach { n =>
           val response = new collection.mutable.HashMap[String, JSON]()
           response("language") = JSONString(n.scope.languages.head)
-          response("notation") = JSONString(toStringMarkers(n).mkString(", "))
+          response("notation") = JSONString(toStringMarkers(n).mkString(" "))
           responseBuffer += JSONObject(response.toSeq: _*);
         }
       case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
