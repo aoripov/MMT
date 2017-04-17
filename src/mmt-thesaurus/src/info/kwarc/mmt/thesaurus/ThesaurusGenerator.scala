@@ -83,7 +83,7 @@ object ThesaurusGenerator {
     var verbs_lang = getByLanguage(theories, language)
     verbs_lang = verbs_lang.slice((page_number - 1) * entries, page_number * entries)
 
-    val out = present(verbs_lang, params)
+    val out = present(verbs_lang, language)
     JSONArray.fromList(out)
   }
 
@@ -113,7 +113,7 @@ object ThesaurusGenerator {
     out.toList
   }
 
-  private def present(verbs: Iterable[(GlobalName, TextNotation)], params:JSONObject): List[JSON] = {
+  private def present(verbs : Iterable[(GlobalName, TextNotation)], language : String): List[JSON] = {
     val items = new collection.mutable.HashMap[String, List[(GlobalName, TextNotation)]]
     verbs foreach {p => p._2.scope.languages.foreach { lang =>
      if (lang != "") {
@@ -123,41 +123,19 @@ object ThesaurusGenerator {
        items(lang) ::= p
      }
     }}
-    def getCls(lang: String) = if (lang == "en") "active" else ""
 
-    val out = verbs map(x => this.present("en", x._1, x._2))
-//    div(attributes = List("id" -> "glossary")) {
-//      ul("nav nav-tabs") {
-//        items.foreach { p =>
-//          li(getCls(p._1)) {
-//            rh(<a data-target={ "#gtab_" + p._1 } class="gs_tab"> { p._1 } </a>)
-//          }
-//        }
-//      }
-//      div("tab-content") {
-//        items.foreach { p =>
-//          div(cls = ("tab-pane " + getCls(p._1)), attributes = List("id" -> ("gtab_" + p._1))) {
-//            ul("glossary") {
-//              val glossary = p._2.toList.sortWith((x,y) => makeString(x._2).toLowerCase() < makeString(y._2).toLowerCase())
-//              glossary.foreach(v => present(p._1, v._1, v._2))
-//            }
-//          }
-//        }
-//      }
-//    }
+    val out = verbs map(x => this.present(language, x._1, x._2))
+
     out.filter(x => x != null).toList
   }
   
   private def getVerbalizations(path: MPath, lang: String) : List[TextNotation] = {
-    
-    //getPrimarySym(path : MPath) : Option[GlobalName]
     val primarySyms = controller.depstore.getInds(IsPrimarySymbol)
     val primarySymO = primarySyms.find { 
       case p : GlobalName => p.module == path 
       case _ => false
     }
     
-    //getVerbs(spath : Option[GlobalName], lang : String) : List[TextNotation]     
     primarySymO.map(controller.get) match {
       case Some(c:Constant) => c.notC.verbalizationDim.get(lang=Some(lang))
       case _ => Nil
