@@ -9,8 +9,9 @@ import info.kwarc.mmt.api.notations._
 import info.kwarc.mmt.api.backend._
 import info.kwarc.mmt.api.ontology._
 import info.kwarc.mmt.api.informal._
+import info.kwarc.mmt.api.modules.DeclaredTheory
 import info.kwarc.mmt.stex._
-import symbols.Constant
+import symbols.{Constant, FinalConstant}
 import utils._
 
 import scala.collection.mutable.ArrayBuffer
@@ -50,11 +51,10 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
   }
   
   def getNotations(params: JSONObject) = {
-      val spathS = params("spath").getOrElse(throw ServerError("No spath found")).toString
-      val languageO = params("language").map(_.toString)
-      val dimensionO = params("dimension").map(_.toString)
-      
-      val spath = Path.parse(spathS)
+      val spath = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+      val languageO = params("language").map(_.toString).map(removeQuotes(_))
+      val dimensionO = params("dimension").map(_.toString).map(removeQuotes(_))
+
       controller.get(spath) match {
         case c : Constant =>
           var notations = dimensionO match {
@@ -113,25 +113,23 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
     val spath = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
     val languageO = params("language").map(_.toString).map(removeQuotes(_))
 
-    val parentSpaths = controller.depstore.queryList(spath, ToSubject(IRels.isDefinedBy))
-
     val responseBuffer = ArrayBuffer.empty[JSON]
 
-    var resultSet = parentSpaths match {  
-      case Nil => controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy))
-      case hd::tl => controller.depstore.queryList(hd, ToObject(IRels.isDefinedBy))
-    }
+    controller.get(spath) match {
+      case c : Constant =>
+        var notations = c.notC.verbalizationDim.notations.values.flatten
+        notations = languageO match {
+          case None => notations
+          case Some(lang) => notations.filter(!_.scope.languages.contains(lang))
+        }
 
-    resultSet = languageO match {
-      case None => resultSet
-      case Some(_) => resultSet.filter(p => sTeX.getLanguage(p) != languageO)
-    }
-
-    resultSet foreach { p =>
-      val response = new collection.mutable.HashMap[String, JSON]()
-      response("language") = JSONString(sTeX.getLanguage(p).getOrElse(throw ServerError("No language found")))
-      response("spath") = JSONString(p.toString)
-      responseBuffer += JSONObject(response.toSeq: _*)
+        notations foreach { n =>
+          val response = new collection.mutable.HashMap[String, JSON]()
+          response("language") = JSONString(n.scope.languages.head)
+          response("notation") = JSONString(toStringMarkers(n).mkString(", "))
+          responseBuffer += JSONObject(response.toSeq: _*);
+        }
+      case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
     }
 
     Server.JsonResponse(JSONArray(responseBuffer : _*))
