@@ -37,6 +37,20 @@ object ThesaurusGenerator {
       case _ => throw new Exception("Expected thesaurus formatter to be loaded")
     }
 
+    println(params.toString)
+
+    val page_number : Int = params("page_number") match {
+      case Some(n:JSONInt) => n.value
+      case Some(d:JSONFloat) => d.value.toInt
+      case _ => 1
+    }
+
+    val entries : Int = params("entries") match {
+      case Some(n:JSONInt) => n.value
+      case Some(d:JSONFloat) => d.value.toInt
+      case _ => 1
+    }
+
     val mpaths = controller.depstore.getInds(ontology.IsTheory).toList
     val modules = mpaths flatMap { p =>
       try {
@@ -65,7 +79,10 @@ object ThesaurusGenerator {
     var language = params("lang").getOrElse("\"en\"").toString // english is default
     language = language.substring(1, language.length - 1)
     theories = theories.sortWith((x,y) => makeString(x._2).toLowerCase() < makeString(y._2).toLowerCase())
-    val verbs_lang = getByLanguage(theories, language)
+
+    var verbs_lang = getByLanguage(theories, language)
+    verbs_lang = verbs_lang.slice((page_number - 1) * entries, page_number * entries)
+
     val out = present(verbs_lang, params)
     JSONArray.fromList(out)
   }
@@ -86,14 +103,14 @@ object ThesaurusGenerator {
     smks.mkString(" ")
   }
 
-  private def getByLanguage(verbs: Iterable[(GlobalName, TextNotation)], language: String): Iterable[(GlobalName, TextNotation)] = {
+  private def getByLanguage(verbs: Iterable[(GlobalName, TextNotation)], language: String): List[(GlobalName, TextNotation)] = {
     val out = new ListBuffer[(GlobalName, TextNotation)]()
     verbs foreach {p => p._2.scope.languages.foreach { lang =>
       if (lang == language) {
         out.append(p)
       }
     }}
-    out
+    out.toList
   }
 
   private def present(verbs: Iterable[(GlobalName, TextNotation)], params:JSONObject): List[JSON] = {
@@ -227,5 +244,9 @@ object ThesaurusGenerator {
     out("definition") = JSONString(sb.get)
 
     JSONObject(out.toSeq : _*)
+  }
+
+  private def removeQuotes(s:String):String = {
+    s.substring(1, s.length - 1)
   }
 }

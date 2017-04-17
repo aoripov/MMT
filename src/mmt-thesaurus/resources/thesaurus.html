@@ -39,7 +39,7 @@
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <form class="navbar-form navbar-left">
-                <div class="form-group">
+                <div class="form-group form-group-sm">
                   <select class="form-control" data-ng-model="filter.language" data-ng-change="getAllEntries()">
                     <option value="en">English</option>
                     <option value="de">German</option>
@@ -49,14 +49,22 @@
                     <option value="zht">Chinese Traditional</option>
                     <!-- <option>DE</option> -->
                   </select>
-                  <select class="form-control" data-ng-model="filter.page">
-                    <option>Page</option>
-                    <option value="1">1</option>
-                    <!-- <option>2</option> -->
-                  </select>
                 </div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-btn">
+                      <button class="btn btn-default" type="button" data-ng-click="filter.prevPage(); getAllEntries()">Prev. Page</button>
+                  </span>
+                  <input type="number" class="form-control" data-ng-model="filter.page" integer data-ng-change="getAllEntries()" min="1" max="999" style="width: 6em">
+                  <span class="input-group-btn">
+                      <button class="btn btn-default" type="button" data-ng-click="filter.nextPage(); getAllEntries()">Next Page</button>
+                  </span>
+                </div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-addon" id="sizing-addon2">Number of entries per page</span>
+                  <input type="number" class="form-control" data-ng-model="filter.entries" integer data-ng-change="getAllEntries()" min="5" max="100" step="5" style="width: 6em">
+                </div>
+
                 {{filter.page}}
-                <button type="submit" class="btn btn-default">Filter</button>
 
               </form>
             </div><!-- /.navbar-collapse -->
@@ -90,19 +98,29 @@
   <script>
     var app = angular.module('myApp', []);
     app.controller('customersCtrl', function($scope, $http) {
-        $scope.language = 'en'
-        $scope.filter = {
-            language:"en",
-            page:1,
-            entries:10
+        function filterObj(language, page, entries) {
+            this.language = language;
+            this.page = page;
+            this.entries = entries;
+
+            this.nextPage = function() {
+                this.page++;
+            };
+
+            this.prevPage = function() {
+                if (this.page > 1)
+                    this.page--;
+            };
         };
+        $scope.language = 'en';
+        $scope.filter = new filterObj("en", 1, 5);
         $scope.getAllEntries = function() {
             $http.post(
                 'http://localhost:8080/:thesaurus/getAllEntries',
                 {
                     lang: $scope.filter.language,
-                    page_number: 1,
-                    entries: 1
+                    page_number: $scope.filter.page,
+                    entries: $scope.filter.entries
                 },
                 {
                     headers : {
@@ -138,7 +156,18 @@
         return function (text) {
             return $sce.trustAsHtml(text);
         };
-    }])
+    }]);
+
+    app.directive('integer', function(){
+    return {
+        require: 'ngModel',
+        link: function(scope, ele, attr, ctrl){
+            ctrl.$parsers.unshift(function(viewValue){
+                return parseInt(viewValue, 10);
+            });
+        }
+    };
+});
 </script>
 </body>
 </html>
