@@ -217,11 +217,15 @@ object ThesaurusGenerator {
       return null
     }
 
+    val out = new collection.mutable.HashMap[String, JSON]()
+
+    out("id") = JSONString(getNewId)
+
+    out("spath") = JSONString(spath.toString)
+
     var sb = new StringBuilder
     presenter.setRh(sb)
     presenter.doNotationRendering(spath, not)
-
-    val out = new collection.mutable.HashMap[String, JSON]()
     out("primary") = JSONString(sb.get)
 
     sb = new StringBuilder
@@ -229,9 +233,7 @@ object ThesaurusGenerator {
     defs foreach { fd =>
       presenter.apply(fd)(sb)
     }
-
     out("definition") = JSONString(sb.get)
-    out("id") = JSONString(getNewId)
 
     JSONObject(out.toSeq : _*)
   }
