@@ -76,16 +76,15 @@
       <div class="col-md-12">
         <div class="panel panel-default" data-ng-repeat="x in myData">
           <div class="panel-body">
-            <div><b><a href="#"><i data-ng-bind-html="x.primary | html"></i></a></b><span class="pull-right"><a data-toggle="collapse" href="#entry{{x.id}}" aria-expanded="false" aria-controls="entry1">Details</a></span></div>
+            <div><b><a href="#"><i data-ng-bind-html="x.primary | html"></i></a></b><span class="pull-right"><a data-toggle="collapse" href="#entry{{x.id}}" aria-expanded="false" data-ng-click="getTranslations(x)">Details</a></span></div>
             <div class="collapse" id="entry{{x.id}}">
             <hr/>
               <div data-ng-bind-html="x.definition | html"></div>
 
               
               <span><b>Translations: </b>
-
-                <!--<a href="#" data-ng-repeat="tr in getTranslation  s(x.spath)">{{tr.notation + "(" + tr.language + ") "}}</a></span><br/>-->
-
+                <a href="#" data-ng-repeat="tr in x.translations">{{tr.notation + "(" + tr.language + ") "}}</a>
+              </span><br/>
               <span><b>Hypernyms: </b><a href="#">Monoid</a></span><br/>
               <span><b>Hyponyms: </b><a href="#">Albelian group></a></span><br/>
             </div>
@@ -130,19 +129,19 @@
                 $scope.myData = response.data;
             });
         };
-        $scope.getTranslations = function($spath) {
+        $scope.getTranslations = function(x) {
             $http.post(
               'http://localhost:8080/:thesaurus/getTranslations',
               {
-                  lang: $scope.language,
-                  spath: $spath
+                  language: $scope.filter.language,
+                  spath: x.spath
               },
               {
                   headers : {
                       'Content-Type' : 'text/plain'
                   }
               }).then(function(response) {
-              $scope.myData = response.data;
+              x.translations = response.data;
           });
         };
         $scope.count = 0;
