@@ -54,7 +54,7 @@
                   <span class="input-group-btn">
                       <button class="btn btn-default" type="button" data-ng-click="filter.prevPage(); getAllEntries()">Prev. Page</button>
                   </span>
-                  <input type="number" class="form-control" data-ng-model="filter.page" integer data-ng-change="getAllEntries()" min="1" max="999" style="width: 6em">
+                  <input type="number" class="form-control" data-ng-model="filter.page" integer data-ng-change="getAllEntries()" min="1" max="999" style="width: 6em" disabled>
                   <span class="input-group-btn">
                       <button class="btn btn-default" type="button" data-ng-click="filter.nextPage(); getAllEntries()">Next Page</button>
                   </span>
@@ -95,10 +95,11 @@
   <script>
     var app = angular.module('myApp', []);
     app.controller('customersCtrl', function($scope, $http) {
-        function filterObj(language, page, entries) {
+        function filterObj(language, page, entries, mmtURL) {
             this.language = language;
             this.page = page;
             this.entries = entries;
+            this.mmtURL = mmtURL
 
             this.nextPage = function() {
                 this.page++;
@@ -114,10 +115,10 @@
             };
         };
         $scope.language = 'en';
-        $scope.filter = new filterObj("en", 1, 5);
+        $scope.filter = new filterObj("en", 1, 5, 'http://localhost:8080');
         $scope.getAllEntries = function() {
             $http.post(
-                'http://localhost:8080/:thesaurus/getAllEntries',
+                $scope.filter.mmtURL + '/:thesaurus/getAllEntries',
                 {
                     lang: $scope.filter.language,
                     page_number: $scope.filter.page,
@@ -133,7 +134,7 @@
         };
         $scope.getTranslations = function(x) {
             $http.post(
-              'http://localhost:8080/:thesaurus/getTranslations',
+              $scope.filter.mmtURL + '/:thesaurus/getTranslations',
               {
                   language: $scope.filter.language,
                   spath: x.spath
