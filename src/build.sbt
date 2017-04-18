@@ -223,12 +223,23 @@ lazy val oeis = (project in file("mmt-oeis")).
     unmanagedJars in Compile += Utils.deploy.toJava / "lib" / "scala-parser-combinators.jar"
   )
 
+lazy val thesaurus = (project in file("mmt-thesaurus")).
+  dependsOn(stex, api).
+  settings(mmtProjectsSettings("mmt-thesaurus"): _*).
+  settings(
+    libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.1"
+  )
+
+lazy val dictionary = (project in file("mmt-dictionary")).
+  dependsOn(api).
+  settings(mmtProjectsSettings("mmt-dictionary"): _*)
+
 // experimental projects that are not part of any tests: marpa-mmt, hets-mmt 
 
 // wrapper project that depends on most other projects
 // the deployed jar is stand-alone and can be used as a unix shell script
 lazy val mmt = (project in file("fatjar")).
-  dependsOn(tptp, stex, pvs, specware, webEdit, oeis, odk, jedit, latex, openmath, imps).
+  dependsOn(tptp, stex, pvs, specware, webEdit, oeis, odk, jedit, latex, openmath, imps, thesaurus, dictionary).
   settings(mmtProjectsSettings("fatjar"): _*).
   settings(
     exportJars := false,
