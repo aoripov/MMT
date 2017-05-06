@@ -14,12 +14,29 @@
   <!--<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>-->
 
   <!-- Angular -->
-    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-sanitize/1.6.4/angular-sanitize.min.js"></script>
 
   <link rel="stylesheet" href="mmt.css">
   <link rel="stylesheet" href="browser.css">
   <link rel="stylesheet" href="latexml.css">
+  <!--<link rel="stylesheet" href="html.css">-->
+
+  <!--JOBAD-->
+  <!--<script src="build/release/libs/js/libs.js"></script>-->
+  <link href="build/release/libs/css/libs.css" rel="stylesheet">
+  <!--<script src="build/release/libs/js/libs.js"></script>-->
+  <!--<script-->
+          <!--src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"-->
+          <!--integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="-->
+          <!--crossorigin="anonymous"></script>-->
+  <script src="build/release/JOBAD.min.js"></script>
+  <link href="build/release/JOBAD.min.css" rel="stylesheet">
+
+  <!--JOBAD Modules-->
+  <script src="ontology-navigation.js"></script>
+  <script src="planetary-gitlab.js"></script>
+  <script src="hovering.js"></script>
 </head>
 <body>
   <div data-ng-app="myApp" data-ng-controller="customersCtrl" class="container" id="glossary">
@@ -40,7 +57,7 @@
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <form class="navbar-form navbar-left">
                 <div class="form-group form-group-sm">
-                  <select class="form-control" data-ng-model="filter.language" data-ng-change="getAllEntries(); filter.resetPage()">
+                  <select class="form-control" data-ng-model="filter.language" data-ng-change="filter.resetPage(); getAllEntries()">
                     <option value="en">English</option>
                     <option value="de">German</option>
                     <option value="ro">Romanian</option>
@@ -74,17 +91,28 @@
       <div class="col-md-12">
         <div class="panel panel-default" data-ng-repeat="x in myData">
           <div class="panel-body">
-            <div><b><a data-toggle="collapse" href="#entry{{x.id}}" data-ng-click="getTranslations(x)"><i data-ng-bind-html="x.primary | html"></i></a></b><span class="pull-right"><a data-toggle="collapse" href="#entry{{x.id}}" aria-expanded="false" data-ng-click="getTranslations(x)">Details</a></span></div>
+            <div><b><a data-toggle="collapse" href="#entry{{x.id}}" data-ng-click="getTranslations(x)"><i data-ng-bind-html="x.primary | html"></i></a></b><span class="pull-right"><a data-toggle="collapse" href="#entry{{x.id}}" aria-expanded="false" data-ng-click="updateEntry(x)">Details</a></span></div>
             <div class="collapse" id="entry{{x.id}}">
             <hr/>
               <div data-ng-bind-html="x.definition | html"></div>
 
               
-              <span><b>Translations: </b>
+              <span data-ng-if="x.translations.length > 0"><b>Translations: </b>
                 <a href="#" data-ng-repeat="tr in x.translations">{{tr.notation + "(" + tr.language + ") "}}</a>
-              </span><br/>
-              <span><b>Hypernyms: </b><a href="#">Monoid</a></span><br/>
-              <span><b>Hyponyms: </b><a href="#">Albelian group></a></span><br/>
+                <br/>
+              </span>
+              <span data-ng-if="x.synonyms.length > 1"><b>Synonyms: </b>
+                <a href="#" data-ng-repeat="tr in x.synonyms">{{tr.notation + " "}}</a>
+                <br/>
+              </span>
+              <span data-ng-if="x.hypernyms.length > 0"><b>Hypernyms: </b>
+                <a href="#" data-ng-repeat="tr in x.hypernyms">{{tr.notation + " "}}</a>
+                <br/>
+              </span>
+              <span data-ng-if="x.hyponyms.length > 0"><b>Hyponyms: </b>
+                <a href="#" data-ng-repeat="tr in x.hyponyms">{{tr.notation + " "}}</a>
+                <br/>
+              </span>
             </div>
           </div>
         </div>
@@ -115,6 +143,7 @@
             };
         };
         $scope.language = 'en';
+        $scope.jobads = [];
         $scope.filter = new filterObj("en", 1, 5, 'http://localhost:8080');
         $scope.getAllEntries = function() {
             $http.post(
@@ -146,6 +175,65 @@
               }).then(function(response) {
               x.translations = response.data;
           });
+        };
+        $scope.getHypernyms = function(x) {
+            $http.post(
+              $scope.filter.mmtURL + '/:thesaurus/getHypernyms',
+              {
+                  language: $scope.filter.language,
+                  spath: x.spath
+              },
+              {
+                  headers : {
+                      'Content-Type' : 'text/plain'
+                  }
+              }).then(function(response) {
+              x.hypernyms = response.data;
+          });
+        };
+        $scope.getHyponyms = function(x) {
+            $http.post(
+              $scope.filter.mmtURL + '/:thesaurus/getHyponyms',
+              {
+                  language: $scope.filter.language,
+                  spath: x.spath
+              },
+              {
+                  headers : {
+                      'Content-Type' : 'text/plain'
+                  }
+              }).then(function(response) {
+              x.hyponyms = response.data;
+          });
+        };
+        $scope.getSynonyms = function(x) {
+            $http.post(
+              $scope.filter.mmtURL + '/:thesaurus/getSynonyms',
+              {
+                  language: $scope.filter.language,
+                  spath: x.spath
+              },
+              {
+                  headers : {
+                      'Content-Type' : 'text/plain'
+                  }
+              }).then(function(response) {
+              x.synonyms = response.data;
+          });
+        };
+        $scope.updateEntry = function(x) {
+            $scope.getTranslations(x);
+            $scope.getHypernyms(x);
+            $scope.getHyponyms(x);
+            $scope.getSynonyms(x);
+            tmp = x.id
+            element =  jQuery("entry" + x.id);
+            if(element.length == 0){ return; } //to not have errors from JOBAD
+            $scope.jobads[x.id] = new JOBAD(element);
+            $scope.jobads[x.id].modules.load("kwarc.mmt.ontology.navigation" ,[], []);
+            $scope.jobads[x.id].modules.load("kwarc.mmt.hovering" ,[], []);
+            $scope.jobads[x.id].modules.load("kwarc.mmt.planetary.gitlab" ,[], []);
+            $scope.jobads[x.id].Setup();
         };
         $scope.count = 0;
         $scope.myfunc = function() {

@@ -38,7 +38,11 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         case "getNotations" :: _ => getNotations(json)
         case "getDefinitions" :: _ => getDefinitions(json)
         case "getAllEntries" :: _ => getAllEntries(json)
+        case "getEntry" :: _ => getEntry(json)
         case "getTranslations" :: _ => getTranslations(json)
+        case "getHypernyms" :: _ => getHypernyms(json)
+        case "getHyponyms" :: _ => getHyponyms(json)
+        case "getSynonyms" :: _ => getSynonyms(json)
         case _ => errorResponse("Invalid request: " + uriComps.mkString("/"), List(new ThesaurusError("Invalid Request" + uriComps)))
        }
     } catch {
@@ -86,27 +90,14 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
   }
   
   private def getDefinitions(params: JSONObject) = {
-      val spath = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
-      val languageO = params("language").map(_.toString).map(removeQuotes(_))
-
-      var resultSet = controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy))
-
-      resultSet = languageO match {
-        case None => resultSet
-        case Some(_) => resultSet.filter(p => sTeX.getLanguage(p) == languageO)
+      val path = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+      val spath = controller.get(path) match {
+        case c: Constant =>
+          c.path
+        case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
       }
-
-      val presenter = controller.extman.get(classOf[Presenter]).find(_.isApplicable("thesaurus")).getOrElse(throw ServerError("No presenter found"))
-      val resultNodes = resultSet flatMap {p => 
-        controller.get(p) match {
-          case s : StructuralElement =>
-            val rb = new presentation.StringBuilder
-            presenter(s)(rb)
-            Some(rb.get)
-          case _ => None
-        }
-      }
-      Server.JsonResponse(JSONArray(resultNodes.map(s => JSONString(s)) :_*))
+      val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+      Server.JsonResponse(JSONString(ThesaurusGenerator.getDefinitions(spath, language)))
   }
 
   private def getTranslations(params: JSONObject) = {
@@ -135,8 +126,92 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
     Server.JsonResponse(JSONArray(responseBuffer : _*))
   }
 
+  private def getHypernyms(params:JSONObject) = {
+    val path: Path = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+    val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+
+    val responseBuffer = ArrayBuffer.empty[JSON]
+
+    val spath = controller.get(path) match {
+      case c: Constant =>
+        c.path
+      case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
+    }
+
+    val hypernyms = ThesaurusGenerator.getHypernyms(spath, language)
+
+    hypernyms foreach { n =>
+      val response = new collection.mutable.HashMap[String, JSON]()
+      response("language") = JSONString(n.scope.languages.head)
+      response("notation") = JSONString(toStringMarkers(n).mkString(" "))
+      responseBuffer += JSONObject(response.toSeq: _*);
+    }
+
+    Server.JsonResponse(JSONArray(responseBuffer : _*))
+  }
+
+
+  private def getHyponyms(params:JSONObject) = {
+    val path: Path = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+    val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+
+    val responseBuffer = ArrayBuffer.empty[JSON]
+
+    val spath = controller.get(path) match {
+      case c: Constant =>
+        c.path
+      case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
+    }
+
+    val hypernyms = ThesaurusGenerator.getHyponyms(spath, language)
+
+    hypernyms foreach { n =>
+      val response = new collection.mutable.HashMap[String, JSON]()
+      response("language") = JSONString(n.scope.languages.head)
+      response("notation") = JSONString(toStringMarkers(n).mkString(" "))
+      responseBuffer += JSONObject(response.toSeq: _*);
+    }
+
+    Server.JsonResponse(JSONArray(responseBuffer : _*))
+  }
+
+  private def getSynonyms(params : JSONObject) = {
+    val path: Path = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+    val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+
+    val responseBuffer = ArrayBuffer.empty[JSON]
+
+    val spath = controller.get(path) match {
+      case c: Constant =>
+        c.path
+      case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
+    }
+
+    val synonyms = ThesaurusGenerator.getSynonyms(spath, language)
+
+    synonyms foreach { n =>
+      val response = new collection.mutable.HashMap[String, JSON]()
+      response("language") = JSONString(n.scope.languages.head)
+      response("notation") = JSONString(toStringMarkers(n).mkString(" "))
+      responseBuffer += JSONObject(response.toSeq: _*);
+    }
+
+    Server.JsonResponse(JSONArray(responseBuffer : _*))
+  }
+
   private def getAllEntries(json: JSONObject) = {
-    Server.JsonResponse(ThesaurusGenerator.generate(controller, json))
+    Server.JsonResponse(ThesaurusGenerator.getAllEntries(controller, json))
+  }
+
+  private def getEntry(params: JSONObject) = {
+    val path: Path = Path.parse(unescapeJava(removeQuotes(params("spath").getOrElse(throw ServerError("No spath found")).toString)))
+    val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+    val spath = controller.get(path) match {
+      case c: Constant =>
+        c.path
+      case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
+    }
+    Server.JsonResponse(ThesaurusGenerator.getEntry(spath, language))
   }
   
   //utils
@@ -160,7 +235,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         messages("0") = JSONObject(message.toSeq : _*)
       }
       status("messages") = JSONObject(messages.toSeq : _*)
-      response("status") = JSONObject(status.toSeq : _*)        
+      response("status") = JSONObject(status.toSeq : _*)
     } else { //there are errors
       val status = new collection.mutable.HashMap[String, JSON]()
       if (content == "") {
@@ -176,7 +251,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
             message("type") = JSONString("Fatal")
             message("shortMsg") = JSONString(se.mainMessage)
             message("longMsg") = JSONString(se.getStackTrace.mkString("\n"))
-            message("srcref") = JSONObject(List("from" -> JSONObject(List("line" -> JSONInt(se.ref.region.start.line), "col"-> JSONInt(se.ref.region.start.column)) : _*), 
+            message("srcref") = JSONObject(List("from" -> JSONObject(List("line" -> JSONInt(se.ref.region.start.line), "col"-> JSONInt(se.ref.region.start.column)) : _*),
                                  "to" -> JSONObject(List("line" -> JSONInt(se.ref.region.end.line), "col" -> JSONInt(se.ref.region.end.column)) : _*)) : _*)
           case e =>
             message("type") = JSONString("Fatal")
@@ -190,7 +265,7 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
       response("status") = JSONObject(status.toSeq : _*)
     }
       log("Sending Response: " + response)
-      Server.JsonResponse(JSONObject(response.toSeq : _*))     
+      Server.JsonResponse(JSONObject(response.toSeq : _*))
   }
 
   private def removeQuotes(s:String):String = {
