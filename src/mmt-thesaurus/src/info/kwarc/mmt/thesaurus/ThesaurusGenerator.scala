@@ -19,27 +19,65 @@ import info.kwarc.mmt.stex._
 import org.apache.commons.lang3.StringEscapeUtils._
 import scala.collection.mutable.ListBuffer
 
-abstract class ThesaurusGeneratorBase {
-  def getNewId() : String
-  def resetId() : Unit
+abstract class ThesaurusGeneratorGenericBase {
+
+  // Generic Thesaurus API functions
+  def getEntry(spath : GlobalName, lang : String) : JSON
+  def getAllEntries(language: String, page_number: Int, entries_per_page: Int): JSON
+  def getSynonyms(spath : GlobalName, lang : String) : Iterable[TextNotation]
+
+  // Non-generic methods, library specific
+  def getDefinitions(spath : GlobalName, lang : String) : String
+  protected def loadAllEntries(controller: Controller): Unit
+}
+
+abstract class ThesaurusGeneratorGeneric extends ThesaurusGeneratorGenericBase {
+
+  private var counter = 0
+  protected var constantPairs: Iterable[(GlobalName, TextNotation)] = new ListBuffer[(GlobalName, TextNotation)]
+
+  def getNewId : String = {
+    this.counter += 1
+    this.counter.toString
+  }
+
+  def resetId() : Unit = {
+    this.counter = 0
+  }
 
   protected var presenter: ThesaurusFormatter = null
   protected var controller: Controller = null
   protected var rh: StringBuilder = null
 
-  def setPresenter(controller: Controller): Unit
+  def setControllerAndPresenter(controller: Controller): Unit
 
-  def getAllEntries(controller: Controller, params: JSONObject): JSON
+  def loadAllEntries(controller: Controller): Unit
 
-  protected def makeString(not : TextNotation) : String = {
-    val smks = not.markers map {
-      case d : Delimiter => d.text
-      case m => m.toString
-    }
-    smks.mkString(" ")
+  def getDefinitions(spath : GlobalName, lang : String) : String
+
+  def getSynonyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = {
+    val constant = controller.library.getConstant(spath)
+    constant.notC.verbalizationDim.get(lang=Some(lang))
   }
 
-  protected def getByLanguage(verbs: Iterable[(GlobalName, TextNotation)], language: String): List[(GlobalName, TextNotation)] = {
+  def getEntry(spath : GlobalName, lang : String) : JSON = {
+    val constant = controller.library.getConstant(spath)
+    val verbs = if (constant.notC.verbalizationDim.isDefined) {
+      constant.notC.verbalizationDim.notations.values.flatten.map(constant.path -> _)
+    } else null
+    JSONArray.fromList(getPresentationAsJSONs(verbs, lang).toList)
+  }
+
+  def getAllEntries(language: String, page_number: Int, entries_per_page: Int): JSON = {
+    this.resetId()
+    JSONArray.fromList(getPresentationAsJSONs(getByPage(getByLanguage(this.constantPairs, language), page_number, entries_per_page),language).toList)
+  }
+
+  protected def getByPage(verbs: Iterable[(GlobalName, TextNotation)], page_number: Int, entries_per_page: Int) : Iterable[(GlobalName, TextNotation)] = {
+    verbs.slice((page_number - 1) * entries_per_page, page_number * entries_per_page)
+  }
+
+  protected def getByLanguage(verbs: Iterable[(GlobalName, TextNotation)], language: String): Iterable[(GlobalName, TextNotation)] = {
     val out = new ListBuffer[(GlobalName, TextNotation)]()
     verbs foreach {p => p._2.scope.languages.foreach { lang =>
       if (lang == language) {
@@ -49,12 +87,81 @@ abstract class ThesaurusGeneratorBase {
     out.toList
   }
 
-  protected def getPresentationAsJSONs(verbs : Iterable[(GlobalName, TextNotation)], language : String): List[JSON] = {
-    val out = verbs map(x => this.getPresentationAsJSON(language, x._1, x._2))
-    out.filter(x => x != null).toList
+  protected def getPresentationAsJSONs(verbs : Iterable[(GlobalName, TextNotation)], language : String): Iterable[JSON] = {
+    val out = verbs map(x => this.getPresentationAsJSON(x._1, x._2, language))
+    out
   }
 
-  protected def getVerbalizations(path: MPath, lang: String) : List[TextNotation] = {
+  protected def getPresentationAsJSON(spath : GlobalName, not: TextNotation, lang : String): JSON = {
+    val constant = controller.library.getConstant(spath)
+
+    val out = new collection.mutable.HashMap[String, JSON]()
+
+    out("id") = JSONString(this.getNewId)
+    out("spath") = JSONString(spath.toString)
+
+    var sb = new StringBuilder
+    presenter.setRh(sb)
+    presenter.doNotationRendering(spath, not)
+    out("primary") = JSONString(sb.get)
+    out("definition") = JSONString(getDefinitions(spath, lang))
+
+//    println(lang + " " + JSONObject(out.toSeq : _*))
+    JSONObject(out.toSeq : _*)
+  }
+
+  protected def makeString(not : TextNotation) : String = {
+    val smks = not.markers map {
+      case d : Delimiter => d.text
+      case m => m.toString
+    }
+    smks.mkString(" ")
+  }
+}
+
+sealed class SMGLOMThesaurusGenerator extends ThesaurusGeneratorGeneric  {
+
+  def setControllerAndPresenter(controller: Controller): Unit = {
+    this.presenter = controller.extman.get(classOf[Presenter], "thesaurus") match {
+      case Some(p: ThesaurusFormatter) => p
+      case _ => throw new Exception("Expected thesaurus formatter to be loaded")
+    }
+    this.controller = controller
+  }
+
+  def loadAllEntries(controller: Controller) : Unit = {
+    if (this.constantPairs.isEmpty) {
+      val mpaths = controller.depstore.getInds(ontology.IsTheory).toList
+      val modules = mpaths flatMap { p =>
+        try {
+          controller.get(p) match {
+            case d: DeclaredTheory => Some(d)
+            case _ => None
+          }
+        } catch {
+          case e: Error => None
+          case e: Exception => None
+        }
+      }
+
+      val verbs = modules collect {
+        case thy: DeclaredTheory =>
+          thy.getDeclarations collect {
+            case c: Constant if c.notC.verbalizationDim.isDefined =>
+              c.notC.verbalizationDim.notations.values.flatten.map(c.path -> _)
+          }
+      }
+
+      val temp = verbs.flatten.flatten.distinct
+      this.constantPairs = temp.sortWith((x,y) => makeString(x._2).toLowerCase() < makeString(y._2).toLowerCase())
+    }
+  }
+
+  def getHypernyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = this.getNymsByRelations(spath, lang, ToObject(IsHypernymOf)).flatten
+
+  def getHyponyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = this.getNymsByRelations(spath, lang, ToSubject(IsHypernymOf)).flatten
+
+  protected def getVerbalizations(path: MPath, lang: String) : Iterable[TextNotation] = {
     val primarySyms = controller.depstore.getInds(IsPrimarySymbol)
     val primarySymO = primarySyms.find {
       case p : GlobalName => p.module == path
@@ -87,125 +194,6 @@ abstract class ThesaurusGeneratorBase {
     }
     //  } else Nil
   }
-
-  def getSynonyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = {
-    val constant = controller.library.getConstant(spath)
-    constant.notC.verbalizationDim.get(lang=Some(lang))
-  }
-
-  protected def getPresentationAsJSON(lang : String,  spath : GlobalName, not: TextNotation): JSON = {
-    val constant = controller.library.getConstant(spath)
-    val doc = spath.doc
-    val mod = spath.module.name
-    val name = spath.name
-
-
-    val notations = (constant.notC.parsingDim.notations.values.flatten ++ constant.notC.presentationDim.notations.values.flatten).map(n => spath -> n).toList.distinct
-
-    val response = new collection.mutable.HashMap[String, JSON]()
-
-    val out = new collection.mutable.HashMap[String, JSON]()
-
-    out("id") = JSONString(this.getNewId())
-
-    out("spath") = JSONString(spath.toString)
-
-    var sb = new StringBuilder
-    presenter.setRh(sb)
-    presenter.doNotationRendering(spath, not)
-    out("primary") = JSONString(sb.get)
-    out("definition") = JSONString(getDefinitions(spath, lang))
-
-    JSONObject(out.toSeq : _*)
-  }
-
-  def getDefinitions(spath : GlobalName, lang : String) : String
-
-  def getEntry(spath : GlobalName, lang : String) = {
-    val constant = controller.library.getConstant(spath)
-    val verbs = if (constant.notC.verbalizationDim.isDefined) {
-      constant.notC.verbalizationDim.notations.values.flatten.map(constant.path -> _)
-    } else null
-    JSONArray.fromList(getPresentationAsJSONs(verbs, lang))
-  }
-}
-
-sealed class SMGLOMThesaurusGenerator extends ThesaurusGeneratorBase  {
-
-  private var counter = 0
-  def getNewId() : String = {
-    counter += 1
-    counter.toString
-  }
-
-  def resetId() : Unit = {
-    counter = 0
-  }
-
-  def setPresenter(controller: Controller): Unit = {
-    this.presenter = controller.extman.get(classOf[Presenter], "thesaurus") match {
-      case Some(p: ThesaurusFormatter) => p
-      case _ => throw new Exception("Expected thesaurus formatter to be loaded")
-    }
-  }
-
-  def getAllEntries(controller: Controller, params: JSONObject): JSON = {
-    this.controller = controller
-    this.setPresenter(controller)
-    val page_number : Int = params("page_number") match {
-      case Some(n:JSONInt) => n.value
-      case Some(d:JSONFloat) => d.value.toInt
-      case _ => 1
-    }
-
-    val entries : Int = params("entries") match {
-      case Some(n:JSONInt) => n.value
-      case Some(d:JSONFloat) => d.value.toInt
-      case _ => 1
-    }
-
-    val mpaths = controller.depstore.getInds(ontology.IsTheory).toList
-    val modules = mpaths flatMap { p =>
-      try {
-        controller.get(p) match {
-          case d : DeclaredTheory => Some(d)
-          case _ =>  None
-        }
-      } catch {
-        case e : Error => None
-        case e : Exception => None
-      }
-    }
-
-    val verbs = modules collect {
-      case thy: DeclaredTheory =>
-        thy.getDeclarations collect {
-          case c: Constant if c.notC.verbalizationDim.isDefined =>
-            c.notC.verbalizationDim.notations.values.flatten.map(c.path -> _)
-        }
-    }
-
-    //print(mpaths)
-
-    var theories: List[(GlobalName, TextNotation)] = verbs.flatten.flatten.distinct
-    //    print(modules )
-
-    counter = 0 // reset counter for each request
-
-    var language = params("lang").getOrElse("\"en\"").toString // english is default
-    language = language.substring(1, language.length - 1)
-    theories = theories.sortWith((x,y) => makeString(x._2).toLowerCase() < makeString(y._2).toLowerCase())
-
-    var verbs_lang = getByLanguage(theories, language)
-    verbs_lang = verbs_lang.slice((page_number - 1) * entries, page_number * entries)
-
-    val out = getPresentationAsJSONs(verbs_lang, language)
-    JSONArray.fromList(out)
-  }
-
-  def getHypernyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = this.getNymsByRelations(spath, lang, ToObject(IsHypernymOf)).flatten
-
-  def getHyponyms(spath : GlobalName, lang : String) : Iterable[TextNotation] = this.getNymsByRelations(spath, lang, ToSubject(IsHypernymOf)).flatten
 
   def getDefinitions(spath : GlobalName, lang : String) : String= {
     val defs = controller.depstore.queryList(spath, ToObject(IRels.isDefinedBy))

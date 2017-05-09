@@ -26,7 +26,7 @@ case class ThesaurusError(text : String) extends Error(text)
 class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
   
   override val logPrefix = "thesaurus"
-     /** Server */   
+     /** Server */
   def apply(uriComps: List[String], query: String, body : Body, session: Session): HLet = {
     lazy val json = body.asJSON match {
       case j: JSONObject => j
@@ -200,7 +200,24 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
   }
 
   private def getAllEntries(json: JSONObject) = {
-    Server.JsonResponse(ThesaurusGenerator.getAllEntries(controller, json))
+    val language = json("lang").map(_.toString).map(removeQuotes(_)).getOrElse("en")
+
+    val page_number : Int = json("page_number") match {
+      case Some(n:JSONInt) => n.value
+      case Some(d:JSONFloat) => d.value.toInt
+      case _ => 1
+    }
+
+    val entries_per_page : Int = json("entries") match {
+      case Some(n:JSONInt) => n.value
+      case Some(d:JSONFloat) => d.value.toInt
+      case _ => 1
+    }
+
+    ThesaurusGenerator.setControllerAndPresenter(controller)
+    ThesaurusGenerator.loadAllEntries(controller)
+
+    Server.JsonResponse(ThesaurusGenerator.getAllEntries(language, page_number, entries_per_page))
   }
 
   private def getEntry(params: JSONObject) = {
