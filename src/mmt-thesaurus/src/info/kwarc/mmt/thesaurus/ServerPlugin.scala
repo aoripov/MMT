@@ -96,6 +96,8 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
           c.path
         case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
       }
+      ThesaurusGenerator.setControllerAndPresenter(controller)
+      ThesaurusGenerator.loadAllEntries(controller)
       val language = params("language").map(_.toString).map(removeQuotes(_)).getOrElse("en")
       Server.JsonResponse(JSONString(ThesaurusGenerator.getDefinitions(spath, language)))
   }
@@ -138,6 +140,9 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
       case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
     }
 
+    ThesaurusGenerator.setControllerAndPresenter(controller)
+    ThesaurusGenerator.loadAllEntries(controller)
+
     val hypernyms = ThesaurusGenerator.getHypernyms(spath, language)
 
     hypernyms foreach { n =>
@@ -162,6 +167,8 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         c.path
       case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
     }
+    ThesaurusGenerator.setControllerAndPresenter(controller)
+    ThesaurusGenerator.loadAllEntries(controller)
 
     val hypernyms = ThesaurusGenerator.getHyponyms(spath, language)
 
@@ -187,6 +194,8 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
       case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
     }
 
+    ThesaurusGenerator.setControllerAndPresenter(controller)
+    ThesaurusGenerator.loadAllEntries(controller)
     val synonyms = ThesaurusGenerator.getSynonyms(spath, language)
 
     synonyms foreach { n =>
@@ -228,6 +237,9 @@ class ThesaurusPlugin extends ServerExtension("thesaurus") with Logger {
         c.path
       case x => throw ServerError("Expected path pointing to constant, found :" + x.getClass)
     }
+
+    ThesaurusGenerator.setControllerAndPresenter(controller)
+    ThesaurusGenerator.loadAllEntries(controller)
     Server.JsonResponse(ThesaurusGenerator.getEntry(spath, language))
   }
   

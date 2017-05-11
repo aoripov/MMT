@@ -98,15 +98,15 @@
 
               
               <span data-ng-if="x.translations.length > 0"><b>Translations: </b>
-                <a href="#" data-ng-repeat="tr in x.translations">{{tr.notation + "(" + tr.language + ") "}}</a>
+                <a href="#" data-ng-repeat="tr in x.translations" data-ng-click="toTranslation(x.spath, tr.lang)">{{tr.notation + "(" + tr.language + ") "}}</a>
                 <br/>
               </span>
               <span data-ng-if="x.synonyms.length > 1"><b>Synonyms: </b>
-                <a href="#" data-ng-repeat="tr in x.synonyms">{{tr.notation + " "}}</a>
+                <a href="#" data-ng-repeat="tr in x.synonyms" >{{tr.notation + " "}}</a>
                 <br/>
               </span>
               <span data-ng-if="x.hypernyms.length > 0"><b>Hypernyms: </b>
-                <a href="#" data-ng-repeat="tr in x.hypernyms">{{tr.notation + " "}}</a>
+                <a href="#" data-ng-repeat="tr in x.hypernyms" >{{tr.notation + " "}}</a>
                 <br/>
               </span>
               <span data-ng-if="x.hyponyms.length > 0"><b>Hyponyms: </b>
@@ -234,6 +234,21 @@
             $scope.jobads[x.id].modules.load("kwarc.mmt.hovering" ,[], []);
             $scope.jobads[x.id].modules.load("kwarc.mmt.planetary.gitlab" ,[], []);
             $scope.jobads[x.id].Setup();
+        };
+        $scope.goTranslation = function(path, lang) {
+            $http.post(
+                $scope.filter.mmtURL + '/:thesaurus/getEntry',
+                {
+                    language: lang,
+                    spath: path
+                },
+                {
+                    headers : {
+                        'Content-Type' : 'text/plain'
+                    }
+                }).then(function(response) {
+                $scope.myData = response.data;
+            });
         };
         $scope.count = 0;
         $scope.myfunc = function() {

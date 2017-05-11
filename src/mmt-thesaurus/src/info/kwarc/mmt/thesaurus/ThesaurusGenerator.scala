@@ -19,19 +19,21 @@ import info.kwarc.mmt.stex._
 import org.apache.commons.lang3.StringEscapeUtils._
 import scala.collection.mutable.ListBuffer
 
-abstract class ThesaurusGeneratorGenericBase {
+trait ThesaurusGeneratorGenericBase {
 
   // Generic Thesaurus API functions
   def getEntry(spath : GlobalName, lang : String) : JSON
   def getAllEntries(language: String, page_number: Int, entries_per_page: Int): JSON
   def getSynonyms(spath : GlobalName, lang : String) : Iterable[TextNotation]
-
-  // Non-generic methods, library specific
-  def getDefinitions(spath : GlobalName, lang : String) : String
-  protected def loadAllEntries(controller: Controller): Unit
 }
 
-abstract class ThesaurusGeneratorGeneric extends ThesaurusGeneratorGenericBase {
+trait ThesaurusGeneratorNonGenericBase {
+  // Non-generic methods, library specific
+  def getDefinitions(spath : GlobalName, lang : String) : String
+    protected def loadAllEntries(controller: Controller): Unit
+}
+
+abstract class ThesaurusGeneratorGeneric extends ThesaurusGeneratorGenericBase with ThesaurusGeneratorNonGenericBase {
 
   private var counter = 0
   protected var constantPairs: Iterable[(GlobalName, TextNotation)] = new ListBuffer[(GlobalName, TextNotation)]
@@ -63,7 +65,8 @@ abstract class ThesaurusGeneratorGeneric extends ThesaurusGeneratorGenericBase {
   def getEntry(spath : GlobalName, lang : String) : JSON = {
     val constant = controller.library.getConstant(spath)
     val verbs = if (constant.notC.verbalizationDim.isDefined) {
-      constant.notC.verbalizationDim.notations.values.flatten.map(constant.path -> _)
+      constant.notC.verbalizationDim.get(lang=Some(lang)).map(constant.path -> _)
+//      constant.notC.verbalizationDim.notations.values.flatten.map(constant.path -> _)
     } else null
     JSONArray.fromList(getPresentationAsJSONs(verbs, lang).toList)
   }

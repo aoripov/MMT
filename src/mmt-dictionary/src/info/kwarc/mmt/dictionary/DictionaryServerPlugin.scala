@@ -20,6 +20,8 @@ class DictionaryServerPlugin  extends ServerExtension("dictionary") with Logger 
 
     try {
       uriComps match {
+        case "getTranslation" :: _ => getTranslation(json)
+        case "getSuggestions" :: _ => getSuggestions(json)
         case _ => errorResponse("Invalid request: " + uriComps.mkString("/"), List(new DictionaryError("Invalid Request" + uriComps)))
       }
     } catch {
@@ -29,6 +31,42 @@ class DictionaryServerPlugin  extends ServerExtension("dictionary") with Logger 
       case e : Exception =>
         errorResponse("Exception occurred : " + e.getStackTrace, List(e))
     }
+  }
+
+  private def getTranslation(param: JSONObject) = {
+    val from = param("from").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found from"))
+    val to = param("to").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found to"))
+    val q = param("q").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found query"))
+
+    SMGloMDictionary.setController(controller)
+    SMGloMDictionary.loadIndex()
+
+    val translations = SMGloMDictionary.findTranslations(from, to, q)
+    val out = translations match {
+      case Some(a)  => {
+        val out = new collection.mutable.HashMap[String, JSON]()
+        val trans = a._2 map (s => JSONString(s))
+        out("trans") = JSONArray.fromList(trans)
+        out("p") = JSONString(a._1.toPath)
+        out("t") = JSONString(a._3)
+        JSONObject(out.toSeq: _*)
+    }}
+
+    Server.JsonResponse(out)
+  }
+
+  private def getSuggestions(param: JSONObject) = {
+    val from = param("from").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found from"))
+    val to = param("to").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found to"))
+    val q = param("q").map(_.toString).map(removeQuotes(_)).getOrElse(throw ServerError("Not found query"))
+
+    SMGloMDictionary.setController(controller)
+    SMGloMDictionary.loadIndex()
+
+    val translations = SMGloMDictionary.findByPrefix(from, to, q)
+    val out = translations map (a => JSONString(a._3))
+
+    Server.JsonResponse(JSONArray.fromList(out.toList))
   }
 
   private def errorResponse(text : String, errors : List[Throwable]) : HLet = {
@@ -81,5 +119,9 @@ class DictionaryServerPlugin  extends ServerExtension("dictionary") with Logger 
     }
     log("Sending Response: " + response)
     Server.JsonResponse(JSONObject(response.toSeq : _*))
+  }
+
+  private def removeQuotes(s:String):String = {
+    s.substring(1, s.length - 1)
   }
 }
